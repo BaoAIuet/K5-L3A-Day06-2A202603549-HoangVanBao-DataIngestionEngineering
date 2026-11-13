@@ -9,6 +9,8 @@ FOOTER_EVEN = re.compile(r"^\s*(\d{1,3}\s+)?Chapter\s+\d{1,2}\s*[•·]\s*[^\d]+
 FOOTER_EVEN2 = re.compile(r"^\s*\d{1,3}\s+\d{1,2}\s*[•·]\s*[A-Za-z][A-Za-z ,&'’\-]*$")
 ACCESS = re.compile(r"Access for free at openstax\.org", re.I)
 LABEL = re.compile(r"^\s*CONCEPT CHECK\s*$", re.I)
+# Chú thích ảnh còn sót: "... one time. Credit (New America/ flickr/ Attribution 2.0 Generic (CC BY 2.0))"
+CREDIT = re.compile(r"\s*Credit \(.*\)\s*$")
 # Số chú thích dính sau dấu câu: "goals.25 People", "findings,76 Fiedler"
 FOOTNOTE = re.compile(r"(?<=[A-Za-z’”)\"][.!?,;:])\d{1,3}(?=\s|$)")
 SENT_END = re.compile(r"[.!?][”\")\]]*$")
@@ -22,11 +24,12 @@ NUM_ITEM = re.compile(r"^\d{1,2}\.\s+[A-Z]")
 
 def clean_lines(raw):
     raw = unicodedata.normalize("NFC", raw).replace("\u00a0", " ").replace("\u00ad", "")
+    src = [ln.strip() for ln in raw.splitlines() if ln.strip()]
     out, log = [], []
     in_exhibit = False
-    for ln in raw.splitlines():
-        s = ln.strip()
-        if not s:
+    skip_until = -1
+    for i, s in enumerate(src):
+        if i <= skip_until:
             continue
         if (ACCESS.search(s) or FOOTER_ODD.match(s) or FOOTER_EVEN.match(s)
                 or FOOTER_EVEN2.match(s)):
@@ -37,19 +40,33 @@ def clean_lines(raw):
             log.append(("label", s))
             continue
         if EXHIBIT.match(s):
-            log.append(("exhibit_caption", s))
-            in_exhibit = True
+            # caption ảnh: kết thúc ở dòng có "Credit (...)" trong vòng 6 dòng tới
+            end = next((j for j in range(i + 1, min(i + 7, len(src)))
+                        if CREDIT.search(src[j])), None)
+            if end is not None:
+                for k in range(i, end + 1):
+                    log.append(("exhibit_caption" if k == i else "exhibit_continuation", src[k]))
+                skip_until = end
+                in_exhibit = False
+            else:
+                log.append(("exhibit_caption", s))
+                in_exhibit = True
             continue
         if in_exhibit and EXHIBIT_CONT.match(s):
             log.append(("exhibit_continuation", s))
             continue
         in_exhibit = False
+        s_c = CREDIT.sub("", s)
+        if s_c != s:
+            log.append(("image_credit", s))
+            s = s_c.strip()
+            if not s:
+                continue
         s2 = FOOTNOTE.sub("", s)
         if s2 != s:
             log.append(("footnote_marker", s))
         out.append(s2)
     return out, log
-
 
 def _join(a, b):
     # "well-" + "understood" -> "well-understood" (giữ gạch nối, bỏ khoảng trắng)
@@ -74,7 +91,8 @@ def _is_heading(line, prev, nxt):
 
 def to_blocks(lines):
     """Lines -> blocks {type: heading|para|bullet, text}."""
-    maxlen = max((len(l) for l in lines), default=0)
+    lens = sorted(len(l) for l in lines)
+    maxlen = lens[int(len(lens) * 0.75)] if lens else 0
     blocks, cur = [], None
     for i, l in enumerate(lines):
         prev = lines[i - 1] if i else None
