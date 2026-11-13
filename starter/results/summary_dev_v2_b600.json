@@ -1,0 +1,45 @@
+{
+  "split": "dev",
+  "summary": {
+    "A|dev": {
+      "n": 15,
+      "hit@1": 0.733,
+      "evidence_hit@3": 1.0,
+      "page_hit@3": 1.0,
+      "mrr": 0.856
+    },
+    "B|dev": {
+      "n": 15,
+      "hit@1": 0.4,
+      "evidence_hit@3": 0.667,
+      "page_hit@3": 0.733,
+      "mrr": 0.522
+    },
+    "C|dev": {
+      "n": 15,
+      "hit@1": 0.4,
+      "evidence_hit@3": 0.667,
+      "page_hit@3": 0.733,
+      "mrr": 0.522
+    }
+  },
+  "config": {
+    "model": "BAAI/bge-small-en-v1.5",
+    "dims": 384,
+    "A": {
+      "size": 1000,
+      "overlap": 100
+    },
+    "B": {
+      "max_size": 600
+    },
+    "C": "B chunks + metadata filter (chapter) when the question has one",
+    "content_pages": 49,
+    "n_chunks": {
+      "A": 190,
+      "B": 357
+    },
+    "embed_seconds": 30.6,
+    "total_seconds": 33.4
+  }
+}
