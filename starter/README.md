@@ -1,65 +1,60 @@
-# Starter · PostgreSQL + pgvector
+# Data ingestion and vector retrieval (Chroma)
 
-Bộ khởi động **tùy chọn** cho lab cá nhân. Docker Compose tạo PostgreSQL + pgvector local; các file trong `src/` là **khung pseudocode có TODO**, chưa đọc tài liệu, tạo embedding, lưu vector hay chạy benchmark. Bạn cần tự hiện thực. Vẫn có thể chọn Qdrant, Chroma hoặc vector store tương đương theo [GUIDE.md](../GUIDE.md).
+This folder contains the runnable pipeline used for the individual benchmark. It ingests the OpenStax _Principles of Management_ PDF, builds fixed-size and paragraph-based chunks, embeds them with FastEmbed, stores them in persistent Chroma collections, and evaluates A/B/C retrieval strategies.
 
-## Cấu trúc
+The current benchmark uses local embeddings and Chroma; it does not require Docker, PostgreSQL, or an API key. `docker-compose.yml` and `init.sql` remain as optional PostgreSQL + pgvector alternatives and are not used by the recorded results.
+
+## Project layout
 
 ```text
 starter/
-├── docker-compose.yml     # PostgreSQL 16 + pgvector, chỉ mở cổng local
-├── init.sql               # bật extension khi tạo database mới
-├── requirements.txt       # psycopg, pypdf và python-dotenv
-├── .env.example           # cấu hình mẫu; copy thành .env
-├── scripts/check_setup.py # kiểm tra kết nối và extension (đã chạy được)
-├── src/
-│   ├── models.py          # cấu trúc dữ liệu mẫu
-│   ├── ingestion.py       # TODO: đọc / chuẩn hóa tài liệu
-│   ├── chunking.py        # TODO: chia chunk
-│   ├── embeddings.py      # TODO: chọn model API hoặc local
-│   ├── store.py           # TODO: lưu vector, metadata và filter
-│   ├── evaluation.py      # TODO: chấm truy xuất, lưu trace
-│   └── run.py             # TODO: kết nối các bước thành pipeline
-├── data/                  # bạn tự chuẩn bị corpus được phép sử dụng
-└── results/               # lưu kết quả của bạn
+├── data/
+│   ├── benchmark.json       # fixed dev/test questions and gold evidence
+│   ├── manifest.json        # source, license, selected pages, and filter metadata
+│   └── raw/                 # place the source PDF here; do not commit it
+├── results/                 # traces, summaries, logs, and manual audits
+├── scripts/                 # setup, gold/evidence checks, and audit helpers
+└── src/
+    ├── ingestion.py         # PDF parsing and text normalization
+    ├── normalize.py         # cleanup and paragraph/heading detection
+    ├── chunking.py          # fixed-size and paragraph chunking
+    ├── embeddings.py        # BAAI/bge-small-en-v1.5 via FastEmbed
+    ├── store.py             # persistent Chroma, cosine distance, metadata filters
+    ├── evaluation.py        # top-k retrieval traces and metrics
+    └── run.py               # end-to-end benchmark runner
 ```
 
-## 1. Cài và kiểm tra database
+## Setup
 
-Cần Docker Desktop hoặc Docker Engine + Compose, Python **3.11–3.14**, và mạng để tải image/dependencies lần đầu. Các lệnh sau chạy từ thư mục `starter/`:
+Use Python 3.11–3.14; the recorded environment used Python 3.13.17. From this directory:
 
-```bash
-cd starter
-python3 -m venv .venv
-```
-
-Kích hoạt `.venv`: macOS/Linux dùng `source .venv/bin/activate`; Windows PowerShell dùng `.venv\Scripts\Activate.ps1`. Sau đó:
-
-```bash
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-# macOS/Linux: cp .env.example .env
-# Windows PowerShell: Copy-Item .env.example .env
-docker compose -p day6_student_starter up -d --wait
-python scripts/check_setup.py
 ```
 
-Kỳ vọng: hiện tên database, phiên bản PostgreSQL và pgvector, sau đó `Setup OK`. Đây **chỉ là kiểm tra hạ tầng**, không phải kết quả benchmark. Docker dùng cổng `127.0.0.1:55433` và mật khẩu cố định **chỉ dùng local cho lab**; nếu cổng bận, sửa đồng thời port trong `docker-compose.yml` và `DATABASE_URL` trong `.env`. `init.sql` chỉ chạy khi volume mới được tạo; nếu database sẵn có chưa bật extension, xem log Docker và kiểm tra cấu hình thay vì xóa volume chứa dữ liệu.
+On macOS/Linux, activate with `source .venv/bin/activate`.
 
-Dừng container nhưng giữ dữ liệu:
+Obtain the PDF from the source URL in `data/manifest.json` and place it at `data/raw/principles-management.pdf`. The model is downloaded on first use, so that run needs network access. The model runs locally after download; no paid API is used. Do not commit `.env`, secrets, the virtual environment, or data you are not permitted to redistribute.
 
-```bash
-docker compose -p day6_student_starter stop
+## Validate and run
+
+Run commands from `starter/`, since the pipeline uses paths relative to its working directory:
+
+```powershell
+python scripts\check_gold.py
+python scripts\check_evidence.py
+python -m src.run --split dev --tag _v2_b1000
+python -m src.run --split test
 ```
 
-## 2. Chọn embedding model
+The dev run evaluates A (fixed 1,000 characters, 100-character overlap), B (paragraph chunks capped at 1,000 characters), and C (the same B chunks with the `chapter` filter when the question specifies one). Use `--b-max 600 --tag _v2_b600` for the additional B-size experiment. A tag selects a separate default Chroma path such as `data/chroma_v2_b1000`; `CHROMA_PATH`, if set, overrides that path.
 
-Điền key tương ứng trong `.env` nếu dùng OpenRouter, OpenAI hoặc Gemini; **không commit `.env`**. Model local không cần API key. `requirements.txt` chỉ có dependencies cơ bản: tự cài SDK hoặc thư viện local phù hợp với model bạn chọn và ghi lại version/lệnh cài trong báo cáo. Ghi tên model và số chiều; dùng cùng model cho toàn bộ chiến lược và vector query tương thích vector document.
+Each run writes traces and summaries under `results/`. Re-running a split rewrites its corresponding trace, summary, and generated audit sheets. Do not rerun a benchmark after manually labeling its audit CSVs unless you intend to regenerate those files.
 
-## 3. Hoàn thiện pipeline
+## Manual audits and submission
 
-1. Đặt corpus vào `data/` hoặc cung cấp manifest/hướng dẫn truy cập. Đọc [GUIDE.md](../GUIDE.md) về **30 trang nội dung**, quyền dữ liệu và metadata.
-2. Hoàn thiện từng hàm TODO trong `src/`. Lưu ID tài liệu, nguồn, trang/vị trí và ít nhất một trường filter có ích.
-3. Xây ít nhất ba cấu hình; ví dụ A fixed-size, B theo đoạn, C như B nhưng có filter. Cần cùng corpus, model và benchmark; nạp lại không nhân đôi và xử lý chunk cũ khi dữ liệu đổi.
-4. Tự viết ít nhất 20 câu hỏi kèm evidence, tách dev/test trước khi thử theo [BENCHMARK.md](../BENCHMARK.md). Lưu trace top-3 và báo cáo đủ năm tiêu chí.
-5. Sau khi hoàn thiện, chạy `python -m src.run` từ thư mục `starter/`. Trước khi làm TODO, lệnh này **chủ động báo `NotImplementedError`**.
+`scripts/make_test_audit.py` creates the test grounding and metadata audit CSVs. Fill the score/reason and metadata columns manually, then use `scripts/label_test.py` to resume incomplete labels. `scripts/summarize_test.py` reports retrieval metrics. The manual grounding score assesses retrieved evidence, not LLM answer accuracy.
 
-Lưu code, cấu hình, kết quả và lệnh chạy để người chấm tái lập; không commit key, dữ liệu mật hoặc dữ liệu không có quyền chia sẻ.
+Report the exact commands, model/version, corpus and filter limitations, results for dev and test, and all five benchmark criteria. See the repository-level [GUIDE.md](../GUIDE.md), [BENCHMARK.md](../BENCHMARK.md), and [SUBMISSION.md](../SUBMISSION.md) for grading and packaging requirements.
