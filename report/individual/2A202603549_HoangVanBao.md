@@ -23,26 +23,23 @@ Họ tên: Hoàng Văn Bảo · MSSV: 2A202603549
 
 Dev: 15 câu. Test: 6 câu. Ba lần chạy dev khác nhau ở mức làm sạch dữ liệu (v1 chưa lọc `Credit`/đoạn rác Exhibit, v2 đã lọc) và ngưỡng B.
 
-| Strategy     | Split  | Hit@1 (n/N) | Evidence Hit@3 (n/N) | Chunk count | Thời gian | Chi phí |
-| ------------ | ------ | ----------- | -------------------- | ----------- | --------- | ------- |
-| A            | dev v1 | 10/15       | 15/15                | 190         | [ĐIỀN]    | 0       |
-| B            | dev v1 | 9/15        | 12/15                | 225         | [ĐIỀN]    | 0       |
-| C            | dev v1 | 9/15        | 12/15                | 225         | [ĐIỀN]    | 0       |
-| A            | dev v2 | 11/15       | 15/15                | 190         | [ĐIỀN]    | 0       |
-| B (max 1000) | dev v2 | 9/15        | 11/15                | 224         | [ĐIỀN]    | 0       |
-| C (max 1000) | dev v2 | 9/15        | 11/15                | 224         | [ĐIỀN]    | 0       |
-| B (max 600)  | dev v2 | 6/15        | 10/15                | 357         | [ĐIỀN]    | 0       |
-| C (max 600)  | dev v2 | 6/15        | 10/15                | 357         | [ĐIỀN]    | 0       |
-| A            | test   | 4/6         | 5/6                  | 190         | [ĐIỀN]    | 0       |
-| B (max 1000) | test   | 4/6         | 6/6                  | 224         | [ĐIỀN]    | 0       |
-| C (max 1000) | test   | 4/6         | 6/6                  | 224         | [ĐIỀN]    | 0       |
+## Kết quả
+
+| Strategy | Split | Hit@1 (n/N) | Evidence Hit@3 (n/N) | Chunk count | Thời gian | Chi phí |
+| -------- | ----- | ----------- | -------------------- | ----------- | --------- | ------- |
+| A        | dev   | 11/15       | 15/15                | 190         | 23,4 s\*  | 0       |
+| B        | dev   | 9/15        | 11/15                | 224         | 23,4 s\*  | 0       |
+| C        | dev   | 9/15        | 11/15                | 224         | 23,4 s\*  | 0       |
+| A        | test  | 4/6         | 5/6                  | 190         | 30,5 s\*  | 0       |
+| B        | test  | 4/6         | 6/6                  | 224         | 30,5 s\*  | 0       |
+| C        | test  | 4/6         | 6/6                  | 224         | 30,5 s\*  | 0       |
 
 MRR dev v2: A 0.856, B/C (1000) 0.656, B/C (600) 0.522. MRR test: A 0.722, B/C 0.806.
 
 | Strategy | Coherence trung bình /2 (n) | Metadata đủ và đúng (n/N) | Filter tuân thủ (n/N hoặc N/A)                                        | Grounding 0/1/2 (số câu) và trung bình /2 |
 | -------- | --------------------------- | ------------------------- | --------------------------------------------------------------------- | ----------------------------------------- |
-| A        | [ĐIỀN] (20)                 | [ĐIỀN]                    | N/A (không dùng filter); top-3 của các câu filter vẫn đúng chương 9/9 | [ĐIỀN]                                    |
-| B        | [ĐIỀN] (20)                 | [ĐIỀN]                    | N/A (không dùng filter); top-3 của các câu filter vẫn đúng chương 9/9 | [ĐIỀN]                                    |
+| A        | 1.05 (20)                   | [ĐIỀN]                    | N/A (không dùng filter); top-3 của các câu filter vẫn đúng chương 9/9 | [ĐIỀN]                                    |
+| B        | 1.40 (20)                   | [ĐIỀN]                    | N/A (không dùng filter); top-3 của các câu filter vẫn đúng chương 9/9 | [ĐIỀN]                                    |
 | C        | dùng chunk của B            | [ĐIỀN]                    | 9/9 (3 câu filter × top-3, đúng chương)                               | [ĐIỀN]                                    |
 
 Đường dẫn trace, nhãn thủ công và cách chọn mẫu: trace ở `results/traces_dev*.jsonl`, `results/traces_test.jsonl` (top-3 đầy đủ, cờ `page_hit`, `evidence_hit`); thống kê ở `results/summary_*.json`. Nhãn thủ công ở `results/audit_coherence_v2_b1000.csv` (20 chunk A + 20 chunk B, lấy ngẫu nhiên với seed 42) và `results/audit_grounding_dev_v2_b1000.csv` (45 dòng) [ĐIỀN: và `audit_grounding_test.csv` nếu chấm]. Cách chấm: thang 0-2; coherence 2 = đọc riêng vẫn hiểu trọn ý, 1 = hiểu được nhưng thiếu hoặc thừa một phần, 0 = cụt hoặc chủ yếu là nhiễu; grounding 2 = top-3 đủ để trả lời đúng và dẫn đúng nguồn, 1 = có manh mối nhưng thiếu, 0 = không đủ hoặc sai. [ĐIỀN: nêu rõ nhãn do bạn chấm; nếu có dùng gợi ý của công cụ AI thì ghi là bản nháp bạn đã kiểm tra và tự quyết điểm].
